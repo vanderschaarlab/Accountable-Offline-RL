@@ -1,8 +1,12 @@
+from collections import deque
+
 import gym
+import matplotlib.pyplot as plt
 import numpy as np
-from gym.spaces import Box
-from IPython import embed
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from gym.spaces import Box
 
 ENV_MAX_STEP = 32
 ENV_STATE_DIM = 2
@@ -15,12 +19,9 @@ ENV_SA_DIM = ENV_STATE_DIM + ENV_ACTION_DIM
 torch.cuda.set_device(0)
 
 default_config = dict(
-    early_done=False,
-    int_initialize=False,
-    use_walls=True,
-    init_loc=[0,0],  # None for random location
-    _show=True
+    early_done=False, int_initialize=False, use_walls=True, init_loc=[0, 0], _show=True  # None for random location
 )
+
 
 class Wall:
     def __init__(self, p1, p2):
@@ -50,6 +51,7 @@ class Wall:
             return False
         return True
 
+
 class FourWayGridWorld(gym.Env):
     def __init__(self, env_config=None):
         self.N = 16
@@ -69,15 +71,15 @@ class FourWayGridWorld(gym.Env):
 
     def _fill_walls(self):
         """Let suppose you have three walls, two vertical, one horizontal."""
-        if self.config['use_walls']:
-            print('Building Walls!!!')
-            for wall_i in self.config['wall_list']:
+        if self.config["use_walls"]:
+            print("Building Walls!!!")
+            for wall_i in self.config["wall_list"]:
                 self.walls.append(wall_i)
             # self.walls.append(Wall([8,0], [8, 7.5]))
             # self.walls.append(Wall([8, 8.5], [8, 15.5]))
 
     def _fill_map(self):
-        self.map[self.config['rewarding_loc'][0], self.config['rewarding_loc'][1]] = self.config['reward']
+        self.map[self.config["rewarding_loc"][0], self.config["rewarding_loc"][1]] = self.config["reward"]
         self.traj = []
         self.traj_hist = []
 
@@ -92,11 +94,11 @@ class FourWayGridWorld(gym.Env):
         action = np.clip(action, -1, 1).astype(np.float32)
         new_loc = np.clip(self.loc + action, 0, self.N)
         if any(w.intersect(self.loc, new_loc) for w in self.walls):
-            '''this is for MDP-Rejection'''
+            """this is for MDP-Rejection"""
             pass
-            '''this is for MDP-ET'''
+            """this is for MDP-ET"""
             # reward = - 10.
-            # self.step_num +=1 
+            # self.step_num +=1
             # self.traj.append(self.loc)
             # return self.loc, reward, True, {}
         else:
@@ -107,23 +109,24 @@ class FourWayGridWorld(gym.Env):
         return self.loc, reward, self.done, {}
 
     def render(self, mode=None):
-        import matplotlib.pyplot as plt
         fig, ax = plt.subplots()
         img = ax.imshow(
-            np.transpose(self.map)[::-1, :], aspect=1,
-            extent=[-0.5, self.N + 0.5, -0.5, self.N + 0.5], cmap=plt.cm.hot_r
+            np.transpose(self.map)[::-1, :],
+            aspect=1,
+            extent=[-0.5, self.N + 0.5, -0.5, self.N + 0.5],
+            cmap=plt.cm.hot_r,
         )
         fig.colorbar(img)
         ax.set_aspect(1)
         for w in self.walls:
             x = [w.start[0], w.end[0]]
             y = [w.start[1], w.end[1]]
-            ax.plot(x, y, c='orange')
+            ax.plot(x, y, c="orange")
         if len(self.traj) > 0:
             traj = np.asarray(self.traj)
-            ax.plot(traj[:, 0], traj[:, 1], c='blue', alpha=0.75)
-        ax.set_xlabel('X-coordinate', fontsize= 13)
-        ax.set_ylabel('Y-coordinate', fontsize= 13)
+            ax.plot(traj[:, 0], traj[:, 1], c="blue", alpha=0.75)
+        ax.set_xlabel("X-coordinate", fontsize=13)
+        ax.set_ylabel("Y-coordinate", fontsize=13)
         ax.set_xlim(0, self.N)
         ax.set_ylim(0, self.N)
         if self.config["_show"]:
@@ -131,48 +134,45 @@ class FourWayGridWorld(gym.Env):
         return fig, ax
 
     def render_hist(self, mode=None):
-        import matplotlib.pyplot as plt
         fig, ax = plt.subplots()
         img = ax.imshow(
-            np.transpose(self.map)[::-1, :], aspect=1,
-            extent=[-0.5, self.N + 0.5, -0.5, self.N + 0.5], cmap=plt.cm.hot_r
+            np.transpose(self.map)[::-1, :],
+            aspect=1,
+            extent=[-0.5, self.N + 0.5, -0.5, self.N + 0.5],
+            cmap=plt.cm.hot_r,
         )
         fig.colorbar(img)
         ax.set_aspect(1)
         for w in self.walls:
             x = [w.start[0], w.end[0]]
             y = [w.start[1], w.end[1]]
-            ax.plot(x, y, c='orange')
+            ax.plot(x, y, c="orange")
         if len(self.traj_hist) > 0:
             for i, traj_i in enumerate(self.traj_hist):
-                if i < len(self.traj_hist)/2:
-                    if len(traj_i) >0:
+                if i < len(self.traj_hist) / 2:
+                    if len(traj_i) > 0:
                         traj_i = np.asarray(traj_i)
-                        ax.plot(traj_i[:, 0], traj_i[:, 1], c='blue', alpha=0.25)
-                elif i > len(self.traj_hist)/2:
-                    if len(traj_i) >0:
+                        ax.plot(traj_i[:, 0], traj_i[:, 1], c="blue", alpha=0.25)
+                elif i > len(self.traj_hist) / 2:
+                    if len(traj_i) > 0:
                         traj_i = np.asarray(traj_i)
-                        ax.plot(traj_i[:, 0], traj_i[:, 1], c='green', alpha=0.25)
-        ax.set_xlabel('X-coordinate', fontsize= 13)
-        ax.set_ylabel('Y-coordinate', fontsize= 13)
+                        ax.plot(traj_i[:, 0], traj_i[:, 1], c="green", alpha=0.25)
+        ax.set_xlabel("X-coordinate", fontsize=13)
+        ax.set_ylabel("Y-coordinate", fontsize=13)
         ax.set_xlim(0, self.N)
         ax.set_ylim(0, self.N)
         if self.config["_show"]:
             plt.show()
         return fig, ax
-    
+
     def reset(self):
-        if self.config['init_loc'] is not None:
-            self.loc = np.asarray(self.config['init_loc'])
+        if self.config["init_loc"] is not None:
+            self.loc = np.asarray(self.config["init_loc"])
         else:
-            if self.config['int_initialize']:
-                self.loc = np.random.randint(
-                    0, self.N + 1, size=(2,)
-                ).astype(np.float32)
+            if self.config["int_initialize"]:
+                self.loc = np.random.randint(0, self.N + 1, size=(2,)).astype(np.float32)
             else:
-                self.loc = np.random.uniform(
-                    0, self.N, size=(2,)
-                ).astype(np.float32)
+                self.loc = np.random.uniform(0, self.N, size=(2,)).astype(np.float32)
         self.step_num = 0
 
         self.traj_hist.append(self.traj)
@@ -183,49 +183,47 @@ class FourWayGridWorld(gym.Env):
         if s is not None:
             np.random.seed(s)
 
+
 def draw(compute_action, env_config):
     """compute_action is a function that take current obs (array with shape
     (2,)) as input and return the action: array with shape (2,)."""
-    import matplotlib.pyplot as plt
-    env_config['_show'] = False
+
+    env_config["_show"] = False
     env = FourWayGridWorld(env_config)
     fig, ax = env.render()
     for i in range(17):
         for j in range(17):
             action = compute_action(np.asarray([i, j]))
-            ax.arrow(i, j, action[0], action[1], head_width=0.2, shape='left')
+            ax.arrow(i, j, action[0], action[1], head_width=0.2, shape="left")
     plt.show()
 
 
-
-
-
-def conserv_policy(state, rnd_state = 0.8, eps = 0.15, decay = 0.5,
-                   A = 3.5,
-                   B = 12.5):
+def conserv_policy(state, rnd_state=0.8, eps=0.15, decay=0.5, A=3.5, B=12.5):
     if rnd_state < 0.5:
         if state[0] <= 8:
-            direc = (np.array([8,B]) - np.array(state)) / np.linalg.norm((np.array([8,B]) - np.array(state)))
+            direc = (np.array([8, B]) - np.array(state)) / np.linalg.norm((np.array([8, B]) - np.array(state)))
             return direc * np.random.uniform(decay, 1) + np.random.randn(2) * eps
         else:
-            direc = (np.array([16,8]) - np.array(state)) / np.linalg.norm((np.array([16,8]) - np.array(state)))
+            direc = (np.array([16, 8]) - np.array(state)) / np.linalg.norm((np.array([16, 8]) - np.array(state)))
             return direc * np.random.uniform(decay, 1) + np.random.randn(2) * eps
     else:
         if state[0] <= 8:
-            direc = (np.array([8,A]) - np.array(state)) / np.linalg.norm((np.array([8,A]) - np.array(state)))
+            direc = (np.array([8, A]) - np.array(state)) / np.linalg.norm((np.array([8, A]) - np.array(state)))
             return direc * np.random.uniform(decay, 1) + np.random.randn(2) * eps
         else:
-            direc = (np.array([16,8]) - np.array(state)) / np.linalg.norm((np.array([16,8]) - np.array(state)))
+            direc = (np.array([16, 8]) - np.array(state)) / np.linalg.norm((np.array([16, 8]) - np.array(state)))
             return direc * np.random.uniform(decay, 1) + np.random.randn(2) * eps
+
+
 def eval_policy(policy, eval_episodes=10):
     eval_env = FourWayGridWorld(test_env_config)
-    avg_reward = 0.
+    avg_reward = 0.0
     for _ in range(eval_episodes):
         state, done = eval_env.reset(), False
-        eval_env.loc = [0,8]
+        eval_env.loc = [0, 8]
         while not done:
             action = policy(np.array(state))
-            state, reward, done, _= eval_env.step(action)
+            state, reward, done, _ = eval_env.step(action)
             avg_reward += reward
 
     avg_reward /= eval_episodes
@@ -235,50 +233,57 @@ def eval_policy(policy, eval_episodes=10):
     return avg_reward
 
 
+task1_config = dict(
+    rewarding_loc=[8, 16],
+    use_walls=True,
+    init_loc=[0, 0],
+    reward=10,
+    wall_list=[Wall([8, 0], [8, 7.5]), Wall([8, 8.5], [8, 15.5])],
+)
 
-task1_config = dict(rewarding_loc=[8, 16],
-                    use_walls=True,
-                    init_loc=[0, 0],
-                    reward = 10,
-                    wall_list = [Wall([8,0], [8, 7.5]),
-                                 Wall([8, 8.5], [8, 15.5])]
-                    )
-
-task2_config = dict(rewarding_loc=[8, 8],
-                    use_walls=True,
-                    init_loc=[0, 0],
-                    reward = 10,
-                    wall_list = [Wall([8,0], [8, 7.5]),
-                                 Wall([8, 8.5], [8, 15.5])]
-                    )
-
-
-task3_config = dict(rewarding_loc=[16, 0],
-                    use_walls=True,
-                    init_loc=[8, 16],
-                    reward = 10,
-                    wall_list = [Wall([8,0], [8, 7.5]),
-                                 Wall([8, 8.5], [8, 15.5])]
-                    )
+task2_config = dict(
+    rewarding_loc=[8, 8],
+    use_walls=True,
+    init_loc=[0, 0],
+    reward=10,
+    wall_list=[Wall([8, 0], [8, 7.5]), Wall([8, 8.5], [8, 15.5])],
+)
 
 
-task4_config = dict(rewarding_loc=[16, 0],
-                    use_walls=True,
-                    init_loc=[8, 8],
-                    reward = 10,
-                    wall_list = [Wall([8,0], [8, 7.5]),
-                                 Wall([8, 8.5], [8, 15.5])]
-                    )
+task3_config = dict(
+    rewarding_loc=[16, 0],
+    use_walls=True,
+    init_loc=[8, 16],
+    reward=10,
+    wall_list=[Wall([8, 0], [8, 7.5]), Wall([8, 8.5], [8, 15.5])],
+)
 
-task_conservation_config = dict(rewarding_loc=[16, 8],
-                                use_walls=True,
-                                init_loc=[0, 8],
-                                reward = 10,
-                                wall_list = [Wall([8,0], [8, 3]),
-                                            Wall([8, 4], [8, 12],),
-                                            Wall([8, 13], [8, 16],)]
-                                )
 
+task4_config = dict(
+    rewarding_loc=[16, 0],
+    use_walls=True,
+    init_loc=[8, 8],
+    reward=10,
+    wall_list=[Wall([8, 0], [8, 7.5]), Wall([8, 8.5], [8, 15.5])],
+)
+
+task_conservation_config = dict(
+    rewarding_loc=[16, 8],
+    use_walls=True,
+    init_loc=[0, 8],
+    reward=10,
+    wall_list=[
+        Wall([8, 0], [8, 3]),
+        Wall(
+            [8, 4],
+            [8, 12],
+        ),
+        Wall(
+            [8, 13],
+            [8, 16],
+        ),
+    ],
+)
 
 
 test_env_config = task_conservation_config
@@ -304,9 +309,9 @@ for i in range(EVAL_SIZE):
     state = next_state
     if done:
         state, done = env.reset(), False
-        if i > EVAL_SIZE-30:
+        if i > EVAL_SIZE - 30:
             break
-        
+
 for i in range(EVAL_SIZE):
     # state, reward, done, _ = env.step(np.random.uniform(size=(2,)) * 2 - 1)
     action = conserv_policy(state, rnd_state=0.2)
@@ -318,7 +323,7 @@ for i in range(EVAL_SIZE):
     state = next_state
     if done:
         state, done = env.reset(), False
-        if i > EVAL_SIZE-30:
+        if i > EVAL_SIZE - 30:
             break
 env.render_hist()
 
@@ -336,34 +341,23 @@ print(len(total_next_state_hist))
 print(len(total_reward_hist))
 
 
-from IPython import embed
-from collections import deque
-import torch.nn.functional as F
-import torch.nn as nn
-import torch
-import gym
-import os
-import random
-import numpy as np
-
-
 class Context(nn.Module):
     """
-      This layer just does non-linear transformation(s)
+    This layer just does non-linear transformation(s)
     """
 
-    def __init__(self,
-                 hidden_sizes=[50],
-                 input_dim=None,
-                 hidden_activation=F.relu,
-                 history_length=None,
-                 n_recurrent_layer=3,
-                 action_dim=None,
-                 obsr_dim=None,
-                 device='cpu',
-                 model_type='gru'
-                 ):
-
+    def __init__(
+        self,
+        hidden_sizes=[50],
+        input_dim=None,
+        hidden_activation=F.relu,
+        history_length=None,
+        n_recurrent_layer=3,
+        action_dim=None,
+        obsr_dim=None,
+        device="cpu",
+        model_type="gru",
+    ):
         super(Context, self).__init__()
         self.hid_act = hidden_activation
         self.fcs = []  # list of linear layer
@@ -376,19 +370,23 @@ class Context(nn.Module):
         self.n_recurrent_layer = n_recurrent_layer
         self.model_type = model_type
         # build LSTM or multi-layers FF
-        if model_type == 'lstm':
-            self.recurrent = nn.LSTM(self.input_dim,
-                                     self.hidden_sizes[0],
-                                     bidirectional=False,
-                                     batch_first=True,
-                                     num_layers=self.n_recurrent_layer)
-        elif model_type == 'gru':
-            self.recurrent = nn.GRU(self.input_dim,
-                                    self.hidden_sizes[0],
-                                    bidirectional=False,
-                                    batch_first=True,
-                                    num_layers=self.n_recurrent_layer)
-        elif model_type == 'ff':
+        if model_type == "lstm":
+            self.recurrent = nn.LSTM(
+                self.input_dim,
+                self.hidden_sizes[0],
+                bidirectional=False,
+                batch_first=True,
+                num_layers=self.n_recurrent_layer,
+            )
+        elif model_type == "gru":
+            self.recurrent = nn.GRU(
+                self.input_dim,
+                self.hidden_sizes[0],
+                bidirectional=False,
+                batch_first=True,
+                num_layers=self.n_recurrent_layer,
+            )
+        elif model_type == "ff":
             self.fcs.append(nn.Linear(self.input_dim, self.hidden_sizes[0]))
             for i in range(len(self.hidden_sizes) - 1):
                 self.fcs.append(nn.Linear(self.hidden_sizes[i], self.hidden_sizes[i + 1]))
@@ -397,24 +395,24 @@ class Context(nn.Module):
             raise NotImplementedError
 
     def init_recurrent(self, bsize=None):
-        '''
-            init hidden states
-            Batch size can't be none
-        '''
+        """
+        init hidden states
+        Batch size can't be none
+        """
         # The order is (num_layers, minibatch_size, hidden_dim)
         # LSTM ==> return (torch.zeros(1, bsize, self.hidden_sizes[0]),
         #        torch.zeros(1, bsize, self.hidden_sizes[0]))
         return torch.zeros(1, bsize, self.hidden_sizes[0]).to(self.device)
 
     def forward(self, data):
-        '''
-            pre_x : B * D where B is batch size and D is input_dim
-            pre_a : B * A where B is batch size and A is input_dim
-            previous_reward: B * 1 where B is batch size and 1 is input_dim
-        '''
+        """
+        pre_x : B * D where B is batch size and D is input_dim
+        pre_a : B * A where B is batch size and A is input_dim
+        previous_reward: B * 1 where B is batch size and 1 is input_dim
+        """
         bsize, _, _ = data.shape
         # init lstm/gru
-        if self.model_type == 'lstm' or self.model_type == 'gru':
+        if self.model_type == "lstm" or self.model_type == "gru":
             self.recurrent.flatten_parameters()
             _, hidden = self.recurrent(data)  # hidden is (1, B, hidden_size)
             if self.n_recurrent_layer == 1:
@@ -423,13 +421,12 @@ class Context(nn.Module):
                 #             print('hidden shape', hidden.shape)
                 out = hidden[0].squeeze(0)  # (1, B, hidden_size) ==> (B, hidden_size)
             return out
-        elif self.model_type == 'ff':
+        elif self.model_type == "ff":
             out = data
             for fc in self.fcs:
                 out = self.hid_act(fc(out))
             return out
-        
-        
+
 
 def LP_solver_KNN(
     test_latent_reps: torch.Tensor,
@@ -465,29 +462,29 @@ def LP_solver_KNN(
         # time those two together:
         corpus_latent_reps = (weights.unsqueeze(-1) * train_latent_reps).sum(1)
         error = ((corpus_latent_reps - test_latent_reps) ** 2).sum()
-        #weights_sorted = torch.sort(weights)[0]
-        #regulator = (weights_sorted[:, : (corpus_size - n_keep)]).sum()
+        # weights_sorted = torch.sort(weights)[0]
+        # regulator = (weights_sorted[:, : (corpus_size - n_keep)]).sum()
         loss = error
         loss.backward()
         optimizer.step()
         if (epoch + 1) % n_epoch == 0:
-            print(
-                f"Weight Fitting Epoch: {epoch+1}/{n_epoch} ; Error: {error.item():.3g} ;"
-            )
+            print(f"Weight Fitting Epoch: {epoch+1}/{n_epoch} ; Error: {error.item():.3g} ;")
     final_error = ((corpus_latent_reps - test_latent_reps) ** 2).sum(1).cpu().detach()
     weights = torch.softmax(preweights, dim=-1).cpu().detach()
     return weights, idx_list, final_error
 
 
-def accountable_batched_controller(buffer_sa,
-                                     buffer_r,
-                                     n_rollout=100,
-                                     n_keep=5,
-                                     hist_len=None,
-                                     n_epoch=2000,
-                                     use_latent=False,
-                                     use_hist=False,
-                                     quantile=0.99):
+def accountable_batched_controller(
+    buffer_sa,
+    buffer_r,
+    n_rollout=100,
+    n_keep=5,
+    hist_len=None,
+    n_epoch=2000,
+    use_latent=False,
+    use_hist=False,
+    quantile=0.99,
+):
     env = FourWayGridWorld(test_env_config)
     state_eval = env.reset()
     eval_r_list = []
@@ -501,10 +498,7 @@ def accountable_batched_controller(buffer_sa,
             buffer_sa = np.concatenate((buffer_sa, np.asarray(preinfo_set).reshape(len(preinfo_set), -1)), 1)
     previous_info = deque(maxlen=hist_len)
     for i in range(hist_len):
-        previous_info.append(
-            np.hstack((np.zeros_like(state_eval),
-                       np.zeros(env.action_space.shape),
-                       np.zeros(1))))
+        previous_info.append(np.hstack((np.zeros_like(state_eval), np.zeros(env.action_space.shape), np.zeros(1))))
     traj_eval = [state_eval]
     for step_i in range(ENV_MAX_STEP):
         sampled_action = np.random.uniform(ENV_ACTION_LOW, ENV_ACTION_HIGH, (n_rollout, ENV_ACTION_DIM))
@@ -518,43 +512,59 @@ def accountable_batched_controller(buffer_sa,
         if use_latent:
             test_state = torch.tensor(explor_xa[:, :ENV_STATE_DIM], dtype=torch.float32).cuda()
             test_action = torch.tensor(explor_xa[:, ENV_STATE_DIM:], dtype=torch.float32).cuda()
-            test_preinfo = torch.tensor(np.array(previous_info)[np.newaxis, :, :].repeat(n_rollout, 0), dtype=torch.float32).cuda()
+            test_preinfo = torch.tensor(
+                np.array(previous_info)[np.newaxis, :, :].repeat(n_rollout, 0), dtype=torch.float32
+            ).cuda()
             test_latent_rep = world_model.get_representation(test_state, test_action, test_preinfo).cpu().detach()
         if not use_latent:
             if not use_hist:
-                weights, idx_list, out_err = LP_solver_KNN(test_latent_reps=torch.as_tensor(explor_xa).cuda(),
-                                                           train_latent_reps=torch.as_tensor(buffer_sa).cuda(),
-                                                           n_epoch=n_epoch,
-                                                           n_keep=n_keep)
+                weights, idx_list, out_err = LP_solver_KNN(
+                    test_latent_reps=torch.as_tensor(explor_xa).cuda(),
+                    train_latent_reps=torch.as_tensor(buffer_sa).cuda(),
+                    n_epoch=n_epoch,
+                    n_keep=n_keep,
+                )
             else:
-                weights, idx_list, out_err = LP_solver_KNN(test_latent_reps=torch.as_tensor(explor_xa).cuda(),
-                                                           train_latent_reps=torch.as_tensor(buffer_sa).cuda(),
-                                                           n_epoch=n_epoch,
-                                                           n_keep=n_keep)
+                weights, idx_list, out_err = LP_solver_KNN(
+                    test_latent_reps=torch.as_tensor(explor_xa).cuda(),
+                    train_latent_reps=torch.as_tensor(buffer_sa).cuda(),
+                    n_epoch=n_epoch,
+                    n_keep=n_keep,
+                )
         else:
-            weights, idx_list, out_err = LP_solver_KNN(test_latent_reps=torch.as_tensor(test_latent_rep).cuda(),
-                                                       train_latent_reps=torch.as_tensor(buffer_latent_rep).cuda(),
-                                                       n_epoch=n_epoch,
-                                                       n_keep=n_keep)
+            weights, idx_list, out_err = LP_solver_KNN(
+                test_latent_reps=torch.as_tensor(test_latent_rep).cuda(),
+                train_latent_reps=torch.as_tensor(buffer_latent_rep).cuda(),
+                n_epoch=n_epoch,
+                n_keep=n_keep,
+            )
 
         err_reg = (out_err > np.quantile(out_err, quantile)) * -99
-        a = sampled_action[np.argmax(err_reg + (buffer_r_cumavg.reshape(-1,)[idx_list] * weights.cpu().numpy()).sum(1))]
+        a = sampled_action[
+            np.argmax(
+                err_reg
+                + (
+                    buffer_r_cumavg.reshape(
+                        -1,
+                    )[idx_list]
+                    * weights.cpu().numpy()
+                ).sum(1)
+            )
+        ]
 
         next_state_eval, r, done, _ = env.step(a)
         traj_eval.append(next_state_eval)
         if use_latent:
-            previous_info.append(
-                np.hstack((np.asarray(state_eval),
-                           np.asarray(a),
-                           np.asarray([r]))))
+            previous_info.append(np.hstack((np.asarray(state_eval), np.asarray(a), np.asarray([r]))))
         state_eval = next_state_eval
         eval_r_list.append(r)
-        print('decision step', step_i, 'reward', r)
+        print("decision step", step_i, "reward", r)
         if done:
             break
     env.render()
-    print('total reward', np.sum(eval_r_list))
+    print("total reward", np.sum(eval_r_list))
     return np.sum(eval_r_list), traj_eval
+
 
 buffer_sa = np.concatenate((total_state_hist, total_action_hist), 1)
 buffer_r_cumavg = np.asarray(total_reward_hist)
@@ -566,22 +576,23 @@ for qt in [0.1, 0.3, 0.5, 0.7]:
     eval_traj_dict[str(qt)] = []
     reward_dict[str(qt)] = []
     for repeat in range(100):
-        rwd, traj = accountable_batched_controller(buffer_sa,
-                                              buffer_r_cumavg,
-                                              n_rollout=5000,
-                                              n_keep=100,
-                                              hist_len=2,
-                                              use_latent=False,
-                                              use_hist=False,
-                                              quantile=qt)
+        rwd, traj = accountable_batched_controller(
+            buffer_sa,
+            buffer_r_cumavg,
+            n_rollout=5000,
+            n_keep=100,
+            hist_len=2,
+            use_latent=False,
+            use_hist=False,
+            quantile=qt,
+        )
         eval_traj_dict[str(qt)].append(traj)
         reward_dict[str(qt)].append(rwd)
-        
-for eps in ['0.1', '0.3', '0.5', '0.7']:
-    print('eps:', eps, 'performance:', np.mean(reward_dict[eps]).round(3), np.std(reward_dict[eps]).round(3) )
-    
-    
-    
+
+for eps in ["0.1", "0.3", "0.5", "0.7"]:
+    print("eps:", eps, "performance:", np.mean(reward_dict[eps]).round(3), np.std(reward_dict[eps]).round(3))
+
+
 inverse_idx_list = [0] * len(shuffled_idx)
 for i, idx in enumerate(shuffled_idx):
     inverse_idx_list[idx] = i
@@ -590,47 +601,44 @@ splitted_trajs = []
 subtraj = []
 for i in range(len(sorted_state_list)):
     subtraj.append(sorted_state_list[i])
-    if i < len(sorted_state_list)-1:
-        if np.linalg.norm(sorted_state_list[i+1] - np.array([0., 8.]))==0:
+    if i < len(sorted_state_list) - 1:
+        if np.linalg.norm(sorted_state_list[i + 1] - np.array([0.0, 8.0])) == 0:
             splitted_trajs.append(subtraj)
             subtraj = []
-            
-    
-    
-import matplotlib.pyplot as plt
+
+
 fig, ax = plt.subplots()
 img = ax.imshow(
-    np.transpose(env.map)[::-1, :], aspect=1,
-    extent=[-0.5, env.N + 0.5, -0.5, env.N + 0.5], cmap=plt.cm.hot_r
+    np.transpose(env.map)[::-1, :], aspect=1, extent=[-0.5, env.N + 0.5, -0.5, env.N + 0.5], cmap=plt.cm.hot_r
 )
 # fig.colorbar(img)
 ax.set_aspect(1)
 for w in env.walls:
     x = [w.start[0], w.end[0]]
     y = [w.start[1], w.end[1]]
-    ax.plot(x, y, c='gray')
+    ax.plot(x, y, c="gray")
 
 # show dataset trajectories
 for i, traj_i in enumerate(splitted_trajs):
-    if i < len(splitted_trajs)/2:
-        if len(traj_i) >0:
+    if i < len(splitted_trajs) / 2:
+        if len(traj_i) > 0:
             traj_i = np.asarray(traj_i)
-            ax.plot(traj_i[:, 0], traj_i[:, 1], c='deepskyblue', alpha=0.8, linewidth = 3)
-    elif i > len(splitted_trajs)/2:
-        if len(traj_i) >0:
+            ax.plot(traj_i[:, 0], traj_i[:, 1], c="deepskyblue", alpha=0.8, linewidth=3)
+    elif i > len(splitted_trajs) / 2:
+        if len(traj_i) > 0:
             traj_i = np.asarray(traj_i)
-            ax.plot(traj_i[:, 0], traj_i[:, 1], c='limegreen', alpha=0.8, linewidth = 3)
-            
+            ax.plot(traj_i[:, 0], traj_i[:, 1], c="limegreen", alpha=0.8, linewidth=3)
+
 # show ABC trajectories
-for i, traj_i in enumerate(eval_traj_dict['0.1']):
+for i, traj_i in enumerate(eval_traj_dict["0.1"]):
     if i > 50:
         break
-    if len(traj_i) >0:
+    if len(traj_i) > 0:
         traj_i = np.asarray(traj_i)
-        ax.plot(traj_i[:, 0], traj_i[:, 1], c='gold', alpha=0.8, linewidth = 2)
+        ax.plot(traj_i[:, 0], traj_i[:, 1], c="gold", alpha=0.8, linewidth=2)
 
 
-ax.set_xlabel('X-coordinate', fontsize= 13)
-ax.set_ylabel('Y-coordinate', fontsize= 13)
+ax.set_xlabel("X-coordinate", fontsize=13)
+ax.set_ylabel("Y-coordinate", fontsize=13)
 ax.set_xlim(0, env.N)
 ax.set_ylim(0, env.N)
