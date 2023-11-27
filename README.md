@@ -6,15 +6,25 @@
 **_Test-time decisions made by an agent should have a decision basis in the training decision dataset. Using a latent space decomposition and similarity-based matching, decisions made by agents in offline reinforcement learning can be interpretable._**
 
 
-### Requirement
+### Requirements
+Python 3.9+ is required.
+
+Install the dependencies with
+```shell
+pip install -r requirements.txt
 ```
+
+The requirements are:
+```text
 gym==0.26.2
-pytorch==2.1.0
+torch==2.1.0
 shapely==2.0.2
 scipy==1.11.3
 medkit-learn==0.1.0
 tqdm
 ```
+
+**Note:** for installation with GPU support, follow appropriate instructions from [PyTorch webist](https://pytorch.org/get-started/locally/).
 
 ### To Repruduce Results
 The following code reproduces the results reported in the paper. 
