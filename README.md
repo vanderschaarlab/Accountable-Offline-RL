@@ -20,6 +20,7 @@ gym==0.26.2
 torch==2.1.0
 shapely==2.0.2
 scipy==1.11.3
+matplotlib
 medkit-learn==0.1.0
 tqdm
 ```
