@@ -12,8 +12,9 @@ import argparse
 
 import gym
 import numpy as np
-import TD3
 import torch
+
+import TD3
 import utils
 
 # Runs policy for X episodes and returns average reward
@@ -156,7 +157,7 @@ if __name__ == "__main__":
             if args.save_model:
                 policy.save(f"./models/{file_name}")
 
-    if INV_FORV == 1.0:
+    if args.inv_forv == 1.0:
         np.save(
             f"Dataset/{file_name}_forward",
             {

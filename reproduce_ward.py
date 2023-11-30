@@ -1,4 +1,5 @@
 import itertools
+import os
 import pickle
 
 import matplotlib.pyplot as plt
@@ -326,6 +327,9 @@ plt.xlabel("Latent Dim 1")
 plt.ylabel("Latent Dim 2")
 plt.show()
 
+os.makedirs("results", exist_ok=True)
+plt.savefig("results/ward_latent_space_map.png")
+
 
 def LP_solver_KNN(
     test_latent_reps: torch.Tensor,
@@ -408,3 +412,7 @@ for repeat in range(10):
 
         results_out.append(sub_result)
     repeat_out.append(results_out)
+
+os.makedirs("results", exist_ok=True)
+with open("results/results_ward.npy", "wb") as f:
+    pickle.dump(repeat_out, f)

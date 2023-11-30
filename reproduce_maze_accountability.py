@@ -1,3 +1,4 @@
+import os
 from collections import deque
 
 import gym
@@ -139,6 +140,8 @@ class FourWayGridWorld(gym.Env):
         ax.set_ylim(0, self.N)
         if self.config["_show"]:
             plt.show()
+            os.makedirs("results", exist_ok=True)
+            plt.savefig("results/reproduce_maze_accountability__FourWayGridWorld_render.png")
         return fig, ax
 
     def render_hist(self, mode=None):
@@ -171,6 +174,8 @@ class FourWayGridWorld(gym.Env):
         ax.set_ylim(0, self.N)
         if self.config["_show"]:
             plt.show()
+            os.makedirs("results", exist_ok=True)
+            plt.savefig("results/reproduce_maze_accountability__FourWayGridWorld_render_hist.png")
         return fig, ax
 
     def render_hist_onecolor(self, mode=None):
@@ -203,6 +208,8 @@ class FourWayGridWorld(gym.Env):
         ax.set_ylim(0, self.N)
         if self.config["_show"]:
             plt.show()
+            os.makedirs("results", exist_ok=True)
+            plt.savefig("results/reproduce_maze_accountability__FourWayGridWorld_render_hist_onecolor.png")
         return fig, ax
 
     def reset(self):
@@ -236,6 +243,9 @@ def draw(compute_action, env_config):
             action = compute_action(np.asarray([i, j]))
             ax.arrow(i, j, action[0], action[1], head_width=0.2, shape="left")
     plt.show()
+
+    os.makedirs("results", exist_ok=True)
+    plt.savefig("results/reproduce_maze_accountability__compute_action_draw.png")
 
 
 def eval_policy(policy, eval_episodes=10):
@@ -524,13 +534,15 @@ def accountable_batched_controller(
     state_eval = env.reset()
     eval_r_list = []
     if use_latent:
-        state = torch.tensor(buffer_sa[:, :ENV_STATE_DIM], dtype=torch.float32).cuda()
-        action = torch.tensor(buffer_sa[:, ENV_STATE_DIM:], dtype=torch.float32).cuda()
-        preinfo = torch.tensor(preinfo_set, dtype=torch.float32).cuda()
-        buffer_latent_rep = world_model.get_representation(state, action, preinfo).cpu().detach()
+        raise NotImplementedError
+        # state = torch.tensor(buffer_sa[:, :ENV_STATE_DIM], dtype=torch.float32).cuda()
+        # action = torch.tensor(buffer_sa[:, ENV_STATE_DIM:], dtype=torch.float32).cuda()
+        # preinfo = torch.tensor(preinfo_set, dtype=torch.float32).cuda()
+        # buffer_latent_rep = world_model.get_representation(state, action, preinfo).cpu().detach()
     else:
         if use_hist:
-            buffer_sa = np.concatenate((buffer_sa, np.asarray(preinfo_set).reshape(len(preinfo_set), -1)), 1)
+            raise NotImplementedError
+            # buffer_sa = np.concatenate((buffer_sa, np.asarray(preinfo_set).reshape(len(preinfo_set), -1)), 1)
     previous_info = deque(maxlen=hist_len)
     for i in range(hist_len):
         previous_info.append(np.hstack((np.zeros_like(state_eval), np.zeros(env.action_space.shape), np.zeros(1))))
@@ -546,12 +558,13 @@ def accountable_batched_controller(
         else:
             explor_xa = np.concatenate((forw_state_eval, sampled_action), 1)
         if use_latent:
-            test_state = torch.tensor(explor_xa[:, :ENV_STATE_DIM], dtype=torch.float32).cuda()
-            test_action = torch.tensor(explor_xa[:, ENV_STATE_DIM:], dtype=torch.float32).cuda()
-            test_preinfo = torch.tensor(
-                np.array(previous_info)[np.newaxis, :, :].repeat(n_rollout, 0), dtype=torch.float32
-            ).cuda()
-            test_latent_rep = world_model.get_representation(test_state, test_action, test_preinfo).cpu().detach()
+            raise NotImplementedError
+            # test_state = torch.tensor(explor_xa[:, :ENV_STATE_DIM], dtype=torch.float32).cuda()
+            # test_action = torch.tensor(explor_xa[:, ENV_STATE_DIM:], dtype=torch.float32).cuda()
+            # test_preinfo = torch.tensor(
+            #     np.array(previous_info)[np.newaxis, :, :].repeat(n_rollout, 0), dtype=torch.float32
+            # ).cuda()
+            # test_latent_rep = world_model.get_representation(test_state, test_action, test_preinfo).cpu().detach()
         if not use_latent:
             if not use_hist:
                 weights, idx_list, out_err = LP_solver_KNN(
@@ -568,12 +581,13 @@ def accountable_batched_controller(
                     n_keep=n_keep,
                 )
         else:
-            weights, idx_list, out_err = LP_solver_KNN(
-                test_latent_reps=torch.as_tensor(test_latent_rep).cuda(),
-                train_latent_reps=torch.as_tensor(buffer_latent_rep).cuda(),
-                n_epoch=n_epoch,
-                n_keep=n_keep,
-            )
+            raise NotImplementedError
+            # weights, idx_list, out_err = LP_solver_KNN(
+            #     test_latent_reps=torch.as_tensor(test_latent_rep).cuda(),
+            #     train_latent_reps=torch.as_tensor(buffer_latent_rep).cuda(),
+            #     n_epoch=n_epoch,
+            #     n_keep=n_keep,
+            # )
 
         err_reg = (out_err > np.quantile(out_err, quantile)) * -99
         selected_a_idx = np.argmax(
@@ -706,6 +720,9 @@ for traj_j in range(2):
     fig.subplots_adjust(hspace=0, wspace=0)
     plt.show()
 
+    os.makedirs("results", exist_ok=True)
+    plt.savefig(f"results/reproduce_maze_accountability__decision_corpus_{traj_j}.png")
+
 
 for eps in ["0.1"]:
     fig, ax = plt.subplots(figsize=(4, 4))
@@ -757,3 +774,6 @@ for eps in ["0.1"]:
     plt.scatter([8], [8], color="pink", marker="o", s=120)
     plt.scatter([8], [8], color="pink", marker="o", s=30, label="Start $\pi_4$")
     plt.show()
+
+    os.makedirs("results", exist_ok=True)
+    plt.savefig(f"results/reproduce_maze_accountability__decision_corpus_all.png")

@@ -1,9 +1,7 @@
 import copy
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,7 +18,6 @@ class Actor(nn.Module):
         self.l3 = nn.Linear(256, action_dim)
 
         self.max_action = max_action
-
 
     def forward(self, state):
         a = F.relu(self.l1(state))
@@ -42,7 +39,6 @@ class Critic(nn.Module):
         self.l5 = nn.Linear(256, 256)
         self.l6 = nn.Linear(256, 1)
 
-
     def forward(self, state, action):
         sa = torch.cat([state, action], 1)
 
@@ -54,7 +50,6 @@ class Critic(nn.Module):
         q2 = F.relu(self.l5(q2))
         q2 = self.l6(q2)
         return q1, q2
-
 
     def Q1(self, state, action):
         sa = torch.cat([state, action], 1)
@@ -75,9 +70,8 @@ class TD3(object):
         tau=0.005,
         policy_noise=0.2,
         noise_clip=0.5,
-        policy_freq=2
+        policy_freq=2,
     ):
-
         self.actor = Actor(state_dim, action_dim, max_action).to(device)
         self.actor_target = copy.deepcopy(self.actor)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
@@ -95,27 +89,21 @@ class TD3(object):
 
         self.total_it = 0
 
-
     def select_action(self, state):
         state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         return self.actor(state).cpu().data.numpy().flatten()
 
-
     def train(self, replay_buffer, batch_size=100, update_policy=True):
         self.total_it += 1
 
-        # Sample replay buffer 
+        # Sample replay buffer
         state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise
-            noise = (
-                torch.randn_like(action) * self.policy_noise
-            ).clamp(-self.noise_clip, self.noise_clip)
+            noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
 
-            next_action = (
-                self.actor_target(next_state) + noise
-            ).clamp(-self.max_action, self.max_action)
+            next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
             # Compute the target Q value
             target_Q1, target_Q2 = self.critic_target(next_state, next_action)
@@ -139,7 +127,7 @@ class TD3(object):
                 # Compute actor losse
                 actor_loss = -self.critic.Q1(state, self.actor(state)).mean()
 
-                # Optimize the actor 
+                # Optimize the actor
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
                 self.actor_optimizer.step()
@@ -151,14 +139,12 @@ class TD3(object):
                 for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                     target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-
     def save(self, filename):
         torch.save(self.critic.state_dict(), filename + "_critic")
         torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
 
         torch.save(self.actor.state_dict(), filename + "_actor")
         torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
-
 
     def load(self, filename):
         self.critic.load_state_dict(torch.load(filename + "_critic"))

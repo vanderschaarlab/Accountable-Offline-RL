@@ -1081,5 +1081,8 @@ if __name__ == "__main__":
     print("episodic reward", total_reward)
 
     results["mpc"] = total_reward
+    print("results:")
+    print(results)
+
     os.makedirs("results", exist_ok=True)
     np.save(f"results/results_{alias}.npy", results)

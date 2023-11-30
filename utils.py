@@ -21,7 +21,7 @@ class ReplayBuffer(object):
         self.action[self.ptr] = action
         self.next_state[self.ptr] = next_state
         self.reward[self.ptr] = reward
-        self.not_done[self.ptr] = 1. - done
+        self.not_done[self.ptr] = 1.0 - done
 
         self.ptr = (self.ptr + 1) % self.max_size
         self.size = min(self.size + 1, self.max_size)
@@ -34,8 +34,16 @@ class ReplayBuffer(object):
             torch.FloatTensor(self.action[ind]).to(self.device),
             torch.FloatTensor(self.next_state[ind]).to(self.device),
             torch.FloatTensor(self.reward[ind]).to(self.device),
-            torch.FloatTensor(self.not_done[ind]).to(self.device)
+            torch.FloatTensor(self.not_done[ind]).to(self.device),
         )
 
     def save(self, path):
-        np.savez(path, state=self.state, action=self.action, next_state=self.next_state, reward=self.reward, not_done=self.not_done, size=self.size)
+        np.savez(
+            path,
+            state=self.state,
+            action=self.action,
+            next_state=self.next_state,
+            reward=self.reward,
+            not_done=self.not_done,
+            size=self.size,
+        )
