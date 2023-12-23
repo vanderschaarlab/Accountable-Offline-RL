@@ -379,12 +379,12 @@ def LP_solver_KNN(
 for repeat in range(10):
     results_out = []
 
-    for keep_number in [1, 3, 5, 10, 20, 30, 50, 100]:
+    for keep_number in [3]:
         sub_result = []
         weights, idx_list, out_err = LP_solver_minimalhull(
             test_latent_reps=torch.as_tensor(test_features).cuda(),
             train_latent_reps=torch.as_tensor(train_features).cuda(),
-            n_epoch=10000,
+            n_epoch=100,
             start_k=keep_number,
         )
         weights = weights.cpu().detach().numpy()
@@ -398,7 +398,7 @@ for repeat in range(10):
         sub_result.append(accuracy)
 
         weights, idx_list, out_err = LP_solver_KNN(
-            test_latent_reps=test_x.cuda(), train_latent_reps=train_x.cuda(), n_epoch=10000, n_keep=keep_number
+            test_latent_reps=test_x.cuda(), train_latent_reps=train_x.cuda(), n_epoch=100, n_keep=keep_number
         )
         weights = weights.cpu().detach().numpy()
         convex_pred = np.argmax(np.mean(weights[:, :, np.newaxis] * train_outputs[idx_list], axis=1), axis=1)
